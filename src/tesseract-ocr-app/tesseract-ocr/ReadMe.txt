@@ -1,1 +1,1 @@
-下载tesseract-ocr.7z,解压到当前目录
+下载libicu4c.7z,解压到当前目录

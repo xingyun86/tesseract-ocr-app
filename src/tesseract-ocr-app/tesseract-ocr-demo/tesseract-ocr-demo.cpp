@@ -10,20 +10,43 @@
 #endif // _MSC_VER
 
 void dealImg(const char* path);
-
-int main(int argc, char** argv)
+__inline static
+int MatToJpg(const cv::Mat mat, std::vector<uint8_t>& jpg)
 {
-#ifdef _MSC_VER
-    std::string root = argv[0];
-    if (root.rfind('\\') != std::string::npos)
+    if (mat.empty()) {
+        return 0;
+    }
+    std::vector<int> param = std::vector<int>(2);
+    param[0] = cv::IMWRITE_JPEG_QUALITY;
+    param[1] = 95; // default(95) 0-100
+    cv::imencode(".jpg", mat, jpg, param);
+    return 0;
+}
+
+__inline static
+int JpgToMat(cv::Mat& mat, std::vector<uint8_t> jpg)
+{
+    if (jpg.empty()) {
+        return -1;
+    }
+    if ((jpg[0] == 0xFF && jpg[1] == 0xD8))
     {
-        root = root.substr(0, root.rfind('\\'));
+        mat = cv::imdecode(jpg, cv::IMREAD_COLOR);
     }
     else
     {
-        root = ".";
+        jpg.insert(jpg.begin(), 0xFF);
+        jpg.insert(jpg.begin() + 1, 0xD8);
+        mat = cv::imdecode(jpg, cv::IMREAD_COLOR);
     }
-    SetCurrentDirectoryA(root.c_str());
+    return 0;
+}
+int main(int argc, char** argv)
+{
+#ifdef _MSC_VER
+    std::string root_path(MAX_PATH, '\0');
+    root_path.resize(GetModuleFileNameA(NULL, (LPSTR)root_path.data(), root_path.size()));
+    root_path = root_path.substr(0, root_path.rfind('\\'));
 #endif // _MSC_VER
 
     std::string outText;
@@ -33,28 +56,13 @@ int main(int argc, char** argv)
     imPath = "bbb.png";
     imPath = "aaa.jpg";
     imPath = "zzz.jpg";
-    imPath = "ttt.png";
+    imPath = "test.png";
     if (argc > 1)
     {
         imPath = argv[1];
     }
-    //dealImg(imPath.c_str());
-
-    /*{
-        cv::Mat imag, result;
-        imag = cv::imread(imPath, 0);	//将读入的彩色图像直接以灰度图像读入
-        cv::namedWindow("原图", 1);
-        cv::imshow("原图", imag);
-        result = imag.clone();
-        //进行二值化处理，选择30，200.0为阈值
-        cv::threshold(imag, result, 30, 200.0, cv::THRESH_BINARY);
-        cv::namedWindow("二值化图像");
-        cv::imshow("二值化图像", result);
-        cv::waitKey();
-    }*/
-    std::string languagePath = root + "\\tessdata";
+    std::string languagePath = root_path + "\\tessdata";
     std::string languageType = "chi_sim+eng";
-    //const char* languageType = "chi_sim";
     // Create Tesseract object
     tesseract::TessBaseAPI* ocr = new tesseract::TessBaseAPI();
     /*
@@ -70,8 +78,7 @@ int main(int argc, char** argv)
       OEM_DEFAULT                    Default, based on what is available.
      */
      // 初始化
-    int nRet = ocr->Init(languagePath.c_str(), languageType.c_str(), tesseract::OEM_LSTM_ONLY);
-    //int nRet = ocr->Init(NULL, "eng", tesseract::OEM_LSTM_ONLY);
+    int nRet = ocr->Init(languagePath.c_str(), languageType.c_str(), tesseract::OEM_DEFAULT);
     if (nRet != 0) {
         printf("TessBaseAPI init failed！");
         return -1;
@@ -79,33 +86,22 @@ int main(int argc, char** argv)
 
     // Set Page segmentation mode to PSM_AUTO (3)
     // Other important psm modes will be discussed in a future post.
-    // 设置分割模式
     ocr->SetPageSegMode(tesseract::PSM_AUTO);
 
     // Open input image using OpenCV
-    //cv::Mat im = cv::imread(imPath, cv::IMREAD_COLOR);
+    cv::Mat im_src = cv::imread(imPath, cv::IMREAD_UNCHANGED);
+    /*cv::imshow("", im_src);
+    cv::waitKey();
+    cv::imwrite("fruit111.bmp", im_src);
+    cv::Mat image_bmp;
+    im_src.convertTo(image_bmp, CV_8UC3);
 
+    imwrite("fruit.bmp", image_bmp);*/
+    cv::Mat im_dst = cv::Mat::zeros(cv::Size(im_src.cols * 2, im_src.rows * 2), CV_8UC3);
+    //cv::Mat im_dst = cv::Mat::ones(cv::Size(im_src.cols * 2, im_src.rows * 2), CV_8UC3);
+    cv::resize(im_src, im_dst, cv::Size(im_dst.cols, im_dst.rows));
     // Set image data
-    //ocr->SetImage(im.data, im.cols, im.rows, 3, im.step);
-    cv::Mat colorImage, grayImage, binaryImage;
-    {
-        //将读入的彩色图像直接以灰度图像读入
-        colorImage = cv::imread(imPath, cv::IMREAD_COLOR);
-        //将读入的彩色图像直接以灰度图像读入
-        //grayImage = cv::imread(imPath, cv::IMREAD_GRAYSCALE);
-        //cv::namedWindow("原图", 1);
-        //cv::imshow("原图", grayImage);
-        //binaryImage = grayImage.clone();
-        //进行二值化处理，选择30，200.0为阈值
-        //cv::threshold(grayImage, binaryImage, 30, 200.0, cv::THRESH_OTSU | cv::THRESH_BINARY);
-        //cv::namedWindow("二值化图像");
-        //cv::imshow("二值化图像", binaryImage);
-        //cv::waitKey();
-         // Set image data
-        ocr->SetImage(colorImage.data, colorImage.cols, colorImage.rows, 3, colorImage.step);
-        //ocr->SetImage(grayImage.data, grayImage.cols, grayImage.rows, 3, grayImage.step);
-        //ocr->SetImage(binaryImage.data, binaryImage.cols, binaryImage.rows, 3, binaryImage.step);
-    }
+    ocr->SetImage(im_dst.data, im_dst.cols, im_dst.rows, 3, im_dst.step);
     // Run Tesseract OCR on image
     outText = std::string(ocr->GetUTF8Text());
 
