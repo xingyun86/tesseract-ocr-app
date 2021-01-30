@@ -1,0 +1,5 @@
+﻿;tesseract-ocr-demo_dll.lib : export function
+;author：xingyun86
+LIBRARY tesseract-ocr-demo_dll
+EXPORTS
+ocr_get_string @ 1

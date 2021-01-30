@@ -95,7 +95,12 @@ set(OPENCV_LEPTONICA_LIBRARIES
 	zlib${LIB_EXT}
 )
 # Add source to this project's executable.
-add_executable (${project_name} "tesseract-ocr-demo.cpp" "tesseract-ocr-demo.h")
+add_executable (${project_name} "tesseract-ocr-demo.cpp")
+add_library (${project_name}_dll SHARED 
+	"tesseract-ocr-demo.cpp" 
+	"tesseract-ocr-demo.def" 
+	"tesseract-ocr-demo.rc"
+)
 if (MSVC)
 	list(APPEND project_name_cflags /W4)
 	list(APPEND project_name_defines WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0501)
@@ -119,6 +124,12 @@ if (MSVC)
 	target_compile_options(${project_name}
 							PRIVATE ${project_name_cflags}
 	)
+	target_compile_definitions(${project_name}_dll
+							PRIVATE ${project_name_defines} -DBUILD_DLL_LIBRARY=1
+							)
+	target_compile_options(${project_name}_dll
+							PRIVATE ${project_name_cflags}
+	)
 else()
     set(CMAKE_C_FLAGS "$ENV{CFLAGS} ${CMAKE_C_FLAGS} -fPIC")
     set(CMAKE_CXX_FLAGS "$ENV{CXXFLAGS} ${CMAKE_CXX_FLAGS} -fPIC")
@@ -127,4 +138,37 @@ target_link_libraries(${project_name}
 	PRIVATE libtesseract
 	PRIVATE ${OPENCV_LEPTONICA_LIBRARIES}
 )
+target_link_libraries(${project_name}_dll 
+	PRIVATE libtesseract
+	PRIVATE ${OPENCV_LEPTONICA_LIBRARIES}
+)
+
+add_executable(ocr_app "ocr-app.cpp")
+if (MSVC)
+	list(APPEND project_name_cflags /W4)
+	list(APPEND project_name_defines WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0501)
+	MESSAGE(STATUS "CMAKE_BUILD_TYPE=" ${CMAKE_BUILD_TYPE})
+
+	set(CompilerFlags
+		CMAKE_CXX_FLAGS
+		CMAKE_CXX_FLAGS_DEBUG
+		CMAKE_CXX_FLAGS_RELEASE
+		CMAKE_C_FLAGS
+		CMAKE_C_FLAGS_DEBUG
+		CMAKE_C_FLAGS_RELEASE
+		)
+	foreach(CompilerFlag ${CompilerFlags})
+		string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
+	endforeach()
+	
+	target_compile_definitions(ocr_app
+							PRIVATE ${project_name_defines}
+							)
+	target_compile_options(ocr_app
+							PRIVATE ${project_name_cflags}
+	)
+else()
+    set(CMAKE_C_FLAGS "$ENV{CFLAGS} ${CMAKE_C_FLAGS} -fPIC")
+    set(CMAKE_CXX_FLAGS "$ENV{CXXFLAGS} ${CMAKE_CXX_FLAGS} -fPIC")
+endif(MSVC)
 # TODO: Add tests and install targets if needed.
